@@ -6,9 +6,10 @@ help:
 	@echo "  install     - Install production dependencies"
 	@echo "  install-dev - Install development dependencies"
 	@echo "  test        - Run tests"
-	@echo "  lint        - Run linters (flake8, mypy)"
+	@echo "  lint        - Run linters (flake8, mypy, pylint)"
+	@echo "  security    - Run security checks (safety, bandit)"
 	@echo "  format      - Format code (black, isort)"
-	@echo "  check       - Run all checks (format, lint, test)"
+	@echo "  check       - Run all checks (format, lint, security, test)"
 	@echo "  build       - Build the package"
 	@echo "  run         - Run the application locally"
 	@echo "  clean       - Clean build artifacts"
@@ -32,13 +33,18 @@ lint:
 	python3 -m mypy src/ --ignore-missing-imports
 	python3 -m pylint src/ --rcfile=pylintrc --exit-zero
 
+# Security checks
+security:
+	python3 -m safety check
+	python3 -m bandit -r src/ -f txt
+
 # Formatting
 format:
 	python3 -m black src/ tests/
 	python3 -m isort src/ tests/
 
 # Combined checks
-check: format lint test
+check: format lint security test
 
 # Build
 build:

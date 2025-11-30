@@ -1,5 +1,9 @@
 # BBC News Bulletin Scraper
 
+[![CI](https://github.com/mattribbins/bbc-news-bulletin-scraper/actions/workflows/ci.yml/badge.svg)](https://github.com/mattribbins/bbc-news-bulletin-scraper/actions/workflows/ci.yml)
+[![Release](https://github.com/mattribbins/bbc-news-bulletin-scraper/actions/workflows/release.yml/badge.svg)](https://github.com/mattribbins/bbc-news-bulletin-scraper/actions/workflows/release.yml)
+[![codecov](https://codecov.io/gh/mattribbins/bbc-news-bulletin-scraper/branch/main/graph/badge.svg)](https://codecov.io/gh/mattribbins/bbc-news-bulletin-scraper)
+
 Python application to automatically download and content manage BBC News radio bulletins. Acts as a fancy automated wrapper to `get_iplayer`.
 
 The main use case for this application is for community radio stations which have an agreeement with the BBC to download and re-broadcast BBC Local Radio bulletins on their radio station.

@@ -1,0 +1,56 @@
+name: Validate Project
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+jobs:
+    validate:
+        name: Validate Project Structure
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Validate Docker configuration
+              run: |
+                  # Check Docker files exist
+                  test -f Dockerfile
+                  test -f docker-compose.yml
+
+                  # Validate docker-compose syntax
+                  docker compose config
+
+            - name: Validate Python project structure
+              run: |
+                  # Check required files exist
+                  test -f pyproject.toml
+                  test -f README.md
+                  test -f LICENSE
+                  test -d src/
+                  test -d tests/
+                  test -d config/
+
+                  # Check for required directories in src
+                  test -f src/__init__.py || test -f src/main.py
+
+            - name: Validate configuration files
+              run: |
+                  # Check config directory structure
+                  test -f config/config.yaml
+
+                  # Validate YAML syntax (basic check)
+                  python3 -c "import yaml; yaml.safe_load(open('config/config.yaml'))"
+
+            - name: Check for required tools in container
+              run: |
+                  # Test that the Docker image can be built
+                  docker build -t test-build .
+
+                  # Test that required tools are available in container
+                  docker run --rm test-build get_iplayer --help > /dev/null
+                  docker run --rm test-build ffmpeg -version > /dev/null
+                  docker run --rm test-build python --version
