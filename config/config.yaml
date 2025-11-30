@@ -1,0 +1,106 @@
+# BBC News Bulletin Scraper Configuration
+
+# Application Settings
+app:
+  # Timezone for scheduling (default: system local timezone)
+  # Uncomment the line below to override system timezone:
+  # timezone: "Europe/London"
+
+# BBC Programme Configuration
+programmes:
+  # Example bulletins
+  - name: "BBC Somerset Update"
+    url: "https://www.bbc.co.uk/programmes/p08dy4zh"
+    output_name: "somerset_update"
+    pid_recursive: true
+    enabled: true
+
+  # Additional programmes can be added here
+  - name: "BBC Bristol Update"
+    url: "https://www.bbc.co.uk/programmes/p08m00gv"
+    output_name: "bristol_update"
+    pid_recursive: true
+    enabled: true
+
+# Audio Processing Settings
+audio:
+  # Trim seconds from the start of each bulletin
+  trim_start_seconds: 4.4
+
+  # Audio quality settings (for mp3/m4a)
+  quality: "high" # high, std, med, low
+
+  # Output format
+  format: "wav" # mp3, m4a, wav
+
+  # Normalize audio levels
+  normalize: true
+
+# Scheduling Configuration
+scheduler:
+  # Download at these minutes past each hour
+  # e.g., [5, 35] = 00:05, 00:35, 01:05, 01:35, etc.
+  minutes_past_hour: [25, 45, 56]
+
+  # Operating hours (24-hour format)
+  start_hour: 5 # Start at 05:00
+  end_hour: 20 # End at 20:00
+
+  # Days of week to operate (0=Monday, 6=Sunday)
+  days_of_week: [0, 1, 2, 3, 4, 5, 6] # All days
+
+  # Download immediately on startup (regardless of schedule)
+  download_on_startup: true
+
+  # Timezone for scheduling (default: system local timezone)
+  # timezone: "Europe/London"  # Uncomment to override system timezone
+
+# Output Configuration
+output:
+  # Base output directory (can be network path)
+  base_path: "/app/output"
+
+# Download Configuration
+download:
+  # Temporary download directory
+  temp_path: "/app/downloads"
+
+  # Maximum concurrent downloads
+  max_concurrent: 2
+
+  # Retry settings
+  max_retries: 3
+  retry_delay_seconds: 60
+
+  # Timeout settings
+  timeout_seconds: 600
+
+# Logging Configuration
+logging:
+  level: "INFO" # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "/app/logs/scraper.log"
+  max_file_size_mb: 100
+  backup_count: 5
+
+  # Log retention
+  retention_days: 30
+
+# Health Check Configuration (optional)
+health:
+  enabled: true
+  port: 8080
+  check_interval_minutes: 5
+
+# get_iplayer specific settings
+get_iplayer:
+  # Cache directory
+  cache_dir: "/app/.get_iplayer"
+
+  # Time filtering options
+  since_hours: 48 # --since option (hours from now to search)
+  available_since_hours: 24 # --available-since option (hours programme has been available)
+
+
+  # Additional command line options
+  # extra_options:
+  #   - "--flag"

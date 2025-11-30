@@ -1,0 +1,65 @@
+services:
+  bbc-news-bull-scraper:
+    build: .
+    container_name: bbc-news-bull-scraper
+    restart: unless-stopped
+
+    # Environment variables
+    environment:
+      - TZ=Europe/London
+      - PYTHONUNBUFFERED=1
+      - BBC_CONFIG=/app/config/config.yaml
+
+    # Volume mounts
+    volumes:
+      # Configuration
+      - ./config:/app/config:ro
+
+      # Output directory (change this to your desired output path)
+      - ./output:/app/output
+
+      # Logs
+      - ./logs:/app/logs
+
+      # Cache directory (for get_iplayer)
+      - bbc-news-bull-scraper-cache:/app/.get_iplayer
+
+    # Health check
+    healthcheck:
+      test:
+        ["CMD", "curl", "-f", "http://localhost:8080/health", "||", "exit", "1"]
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # Ports (optional, for health checks and monitoring)
+    ports:
+      - "8080:8080"
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: "0.5"
+        reservations:
+          memory: 128M
+          cpus: "0.1"
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Named volumes
+volumes:
+  bbc-news-bull-scraper-cache:
+    driver: local
+
+# Networks (optional)
+networks:
+  default:
+    name: bbc-news-bull-scraper-network

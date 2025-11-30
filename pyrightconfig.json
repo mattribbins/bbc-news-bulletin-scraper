@@ -1,0 +1,34 @@
+{
+    "include": [
+        "src",
+        "tests"
+    ],
+    "extraPaths": [
+        "src"
+    ],
+    "pythonVersion": "3.11",
+    "typeCheckingMode": "basic",
+    "reportMissingImports": true,
+    "reportMissingTypeStubs": false,
+    "reportImportCycles": false,
+    "reportUnusedImport": true,
+    "reportUnusedClass": false,
+    "reportUnusedFunction": false,
+    "reportUnusedVariable": true,
+    "reportDuplicateImport": true,
+    "reportOptionalSubscript": true,
+    "reportOptionalMemberAccess": true,
+    "reportOptionalCall": true,
+    "reportOptionalIterable": true,
+    "reportOptionalContextManager": true,
+    "reportOptionalOperand": true,
+    "reportUntypedFunctionDecorator": false,
+    "reportUntypedClassDecorator": false,
+    "reportUntypedBaseClass": false,
+    "reportUntypedNamedTuple": false,
+    "reportPrivateUsage": false,
+    "reportConstantRedefinition": false,
+    "reportIncompatibleMethodOverride": true,
+    "reportIncompatibleVariableOverride": true,
+    "reportOverlappingOverloads": true
+}
