@@ -24,7 +24,7 @@ class BulletinScheduler:
         # Setup timezone - use system local timezone if not specified
         timezone_str = self.scheduler_config.get("timezone")
         if timezone_str:
-            self.timezone = pytz.timezone(timezone_str)
+            self.timezone: pytz.BaseTzInfo | None = pytz.timezone(timezone_str)
         else:
             # Use system local timezone
             self.timezone = None  # APScheduler will use system local timezone
@@ -33,7 +33,7 @@ class BulletinScheduler:
         self.scheduler = self._create_scheduler()
 
         # Track job execution
-        self.last_run = None
+        self.last_run: datetime | None = None
         self.total_runs = 0
         self.successful_runs = 0
         self.failed_runs = 0
@@ -92,8 +92,9 @@ class BulletinScheduler:
             # Schedule a one-time job to run immediately (in 2 seconds to allow startup to complete)
             self.scheduler.add_job(
                 func=self._execute_download,
-                trigger='date',
-                run_date=datetime.now(self.timezone).replace(microsecond=0) + timedelta(seconds=2),
+                trigger="date",
+                run_date=datetime.now(self.timezone).replace(microsecond=0)
+                + timedelta(seconds=2),
                 id="startup_download",
                 name="Startup Download",
                 replace_existing=True,
@@ -177,7 +178,9 @@ class BulletinScheduler:
             failed_programmes = [r for r in results if not r.get("success", False)]
 
             total_files = sum(len(r.get("files", [])) for r in successful_programmes)
-            logging.debug(f"Download results: {len(successful_programmes)} successful, {len(failed_programmes)} failed, {total_files} files processed")
+            logging.debug(
+                f"Download results: {len(successful_programmes)} successful, {len(failed_programmes)} failed, {total_files} files processed"
+            )
 
             # Log results
             if successful_programmes:
@@ -198,7 +201,9 @@ class BulletinScheduler:
                 for result in failed_programmes:
                     programme_name = result.get("programme", {}).get("name", "Unknown")
                     error_msg = result.get("error", "Unknown error")
-                    logging.error("Failed programme: %s - %s", programme_name, error_msg)
+                    logging.error(
+                        "Failed programme: %s - %s", programme_name, error_msg
+                    )
 
             self.last_run = job_start_time
 

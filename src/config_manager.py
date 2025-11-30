@@ -17,13 +17,13 @@ class ConfigManager:
         "./config/config-local.yaml",  # Local development first
         "./config/config.yaml",
         "./config.yaml",
-        "/app/config/config.yaml",     # Docker paths last
+        "/app/config/config.yaml",  # Docker paths last
         "/app/config.yaml",
     ]
 
     def __init__(self, config_path: Optional[str] = None):
         self.config_path = config_path
-        self.config = {}
+        self.config: Dict[str, Any] = {}
 
     def load_config(self) -> Optional[Dict[str, Any]]:
         """Load configuration from YAML file."""

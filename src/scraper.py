@@ -40,10 +40,18 @@ class BBCScraper:
         self.audio_processor = AudioProcessor(config)
 
         # Setup directories with environment-aware defaults
-        self.temp_dir = Path(self.download_config.get("temp_path", _get_environment_default_path("downloads")))
-        self.output_dir = Path(self.output_config.get("base_path", _get_environment_default_path("output")))
+        self.temp_dir = Path(
+            self.download_config.get(
+                "temp_path", _get_environment_default_path("downloads")
+            )
+        )
+        self.output_dir = Path(
+            self.output_config.get("base_path", _get_environment_default_path("output"))
+        )
         self.cache_dir = Path(
-            self.get_iplayer_config.get("cache_dir", _get_environment_default_path(".get_iplayer"))
+            self.get_iplayer_config.get(
+                "cache_dir", _get_environment_default_path(".get_iplayer")
+            )
         )
 
         # Create directories
@@ -59,10 +67,7 @@ class BBCScraper:
         try:
             # Try to run get_iplayer --help to check if it's available
             result = subprocess.run(
-                ["get_iplayer", "--help"],
-                capture_output=True,
-                text=True,
-                timeout=10
+                ["get_iplayer", "--help"], capture_output=True, text=True, timeout=10
             )
             if result.returncode != 0:
                 raise RuntimeError("get_iplayer command failed")
@@ -91,7 +96,9 @@ class BBCScraper:
         """Download all enabled programmes."""
         programmes = self.config.get("programmes", [])
         enabled_programmes = [p for p in programmes if p.get("enabled", True)]
-        logging.info(f"Found {len(programmes)} programmes, {len(enabled_programmes)} enabled")
+        logging.info(
+            f"Found {len(programmes)} programmes, {len(enabled_programmes)} enabled"
+        )
 
         results = []
 
@@ -143,9 +150,13 @@ class BBCScraper:
             if result.returncode == 0:
                 logging.info("Download completed for: %s", programme_name)
             elif result.returncode == 1:
-                logging.warning(f"get_iplayer partial success for {programme_name} (some episodes may have failed)")
+                logging.warning(
+                    f"get_iplayer partial success for {programme_name} (some episodes may have failed)"
+                )
             else:
-                logging.error(f"get_iplayer failed completely for {programme_name}: {result.stderr}")
+                logging.error(
+                    f"get_iplayer failed completely for {programme_name}: {result.stderr}"
+                )
                 return {
                     "programme": programme,
                     "success": False,
@@ -155,7 +166,9 @@ class BBCScraper:
 
             # Find downloaded files (works for both success and partial success)
             downloaded_files = self._find_downloaded_files(programme_name)
-            logging.debug(f"Found {len(downloaded_files)} downloaded files for {programme_name}")
+            logging.debug(
+                f"Found {len(downloaded_files)} downloaded files for {programme_name}"
+            )
 
             # Process downloaded files
             processed_files = []
@@ -181,7 +194,7 @@ class BBCScraper:
                 "files": [],
             }
         except Exception as e:
-            programme_name = programme.get('name', 'Unknown')
+            programme_name = programme.get("name", "Unknown")
             logging.error("Download error for %s: %s", programme_name, e)
             return {
                 "programme": programme,
@@ -205,7 +218,9 @@ class BBCScraper:
             # Use URL format as fallback
             cmd.extend(["--url", programme_url])
         else:
-            raise ValueError(f"No valid URL or PID found for programme: {programme.get('name', 'Unknown')}")
+            raise ValueError(
+                f"No valid URL or PID found for programme: {programme.get('name', 'Unknown')}"
+            )
 
         # Get latest episodes only - use recursive to find episodes but limit to recent ones
         if programme.get("pid_recursive", False):
@@ -228,7 +243,9 @@ class BBCScraper:
         cmd.extend(["--type", "radio"])
 
         # Limit to content available since configured hours (latest bulletins only)
-        available_since_hours = self.config.get("get_iplayer", {}).get("available_since_hours", 12)
+        available_since_hours = self.config.get("get_iplayer", {}).get(
+            "available_since_hours", 12
+        )
         cmd.extend(["--available-since", str(available_since_hours)])
 
         # Force download
@@ -261,12 +278,12 @@ class BBCScraper:
         import re
 
         # Match PID pattern (starts with letter, followed by alphanumeric)
-        pid_match = re.search(r'/programmes/([a-z][a-z0-9]+)', url)
+        pid_match = re.search(r"/programmes/([a-z][a-z0-9]+)", url)
         if pid_match:
             return pid_match.group(1)
 
         # If it's already just a PID
-        if re.match(r'^[a-z][a-z0-9]+$', url):
+        if re.match(r"^[a-z][a-z0-9]+$", url):
             return url
 
         return None
@@ -302,7 +319,9 @@ class BBCScraper:
         if programme_files:
             programme_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
             latest_file = [programme_files[0]]  # Return only the most recent
-            logging.info(f"Found latest file for {programme_name}: {latest_file[0].name}")
+            logging.info(
+                f"Found latest file for {programme_name}: {latest_file[0].name}"
+            )
             return latest_file
         else:
             logging.info(f"No recent files found for {programme_name}")
@@ -313,11 +332,15 @@ class BBCScraper:
         programme_lower = programme_name.lower()
 
         # Extract key words from programme name (skip common BBC words)
-        programme_words = programme_lower.replace("bbc", "").replace("update", "").strip().split()
+        programme_words = (
+            programme_lower.replace("bbc", "").replace("update", "").strip().split()
+        )
 
         # Check if any significant programme word appears in filename
         for word in programme_words:
-            if word and len(word) > 2 and word in filename_lower:  # Skip short words like "on", "of"
+            if (
+                word and len(word) > 2 and word in filename_lower
+            ):  # Skip short words like "on", "of"
                 return True
 
         return False
@@ -371,9 +394,7 @@ class BBCScraper:
             logging.error("Error processing file %s: %s", input_file, e)
             return None
 
-    def _generate_output_filename(
-        self, programme: Dict[str, Any]
-    ) -> Path:
+    def _generate_output_filename(self, programme: Dict[str, Any]) -> Path:
         """Generate simple output filename using output_name from programme config."""
         # Get output name from programme config
         output_name = programme.get("output_name")

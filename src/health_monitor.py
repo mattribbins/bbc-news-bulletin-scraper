@@ -84,7 +84,7 @@ class HealthMonitor:
 
         # Health tracking
         self.start_time = datetime.now()
-        self.last_check = None
+        self.last_check: datetime | None = None
         self.error_count = 0
         self.warning_count = 0
 
@@ -167,8 +167,16 @@ class HealthMonitor:
 
         return {
             "healthy": healthy,
-            "timestamp": self.last_check.isoformat(),
-            "uptime_seconds": (self.last_check - self.start_time).total_seconds(),
+            "timestamp": (
+                self.last_check.isoformat()
+                if self.last_check
+                else datetime.now().isoformat()
+            ),
+            "uptime_seconds": (
+                (self.last_check - self.start_time).total_seconds()
+                if self.last_check
+                else 0.0
+            ),
             "checks": checks,
         }
 
@@ -241,7 +249,9 @@ class HealthMonitor:
         try:
             import shutil
 
-            output_path = self.config.get("output", {}).get("base_path", _get_environment_default_path("output"))
+            output_path = self.config.get("output", {}).get(
+                "base_path", _get_environment_default_path("output")
+            )
             total, _used, free = shutil.disk_usage(output_path)
 
             free_gb = free / (1024**3)
@@ -303,7 +313,9 @@ class HealthMonitor:
         try:
             import shutil
 
-            output_path = self.config.get("output", {}).get("base_path", _get_environment_default_path("output"))
+            output_path = self.config.get("output", {}).get(
+                "base_path", _get_environment_default_path("output")
+            )
             total, used, free = shutil.disk_usage(output_path)
 
             return {

@@ -198,7 +198,5 @@ Thumbs.db
 *.aac
 *.flac
 
-# Debug and test files
+# Debug files
 debug_test.py
-test_*.py
-*_test.py
