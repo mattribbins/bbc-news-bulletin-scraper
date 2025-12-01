@@ -13,9 +13,9 @@ This application is provided as-is with no warranty or liability for misuse.
 ## Features
 
 - **Automated Schedule**: Downloads bulletins at configurable days and times
-- **Audio Processing**: Trims audio at the start of the bulletin
+- **Audio Processing**: Trims audio at the start and end of the bulletin
 - **Format Conversion**: Converts audio to desired format (MP3, M4A, WAV)
-- **Audio Normalization**: Optional loudness normalization
+- **Audio Normalization**: Optional loudness normalization (target LUFS)
 - **Flexible Output**: Supports local paths and in theory network shares (Windows/SMB)
 - **Container-Based**: Run the app in your container platform of choice (Docker/Podman)
 

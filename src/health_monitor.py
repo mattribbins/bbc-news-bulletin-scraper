@@ -201,8 +201,14 @@ class HealthMonitor:
                     ]
                 ),
                 "output_path": self.config.get("output", {}).get("base_path"),
-                "trim_seconds": self.config.get("audio", {}).get(
+                "trim_start_seconds": self.config.get("audio", {}).get(
                     "trim_start_seconds", 0
+                ),
+                "trim_end_seconds": self.config.get("audio", {}).get(
+                    "trim_end_seconds", 0
+                ),
+                "normalise_lufs": self.config.get("audio", {}).get(
+                    "normalise_lufs", None
                 ),
             },
         }
