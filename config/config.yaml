@@ -27,14 +27,21 @@ audio:
   # Trim seconds from the start of each bulletin
   trim_start_seconds: 4.4
 
+  # Trim seconds from the end of each bulletin
+  trim_end_seconds: 0.0
+
   # Audio quality settings (for mp3/m4a)
   quality: "high" # high, std, med, low
 
   # Output format
   format: "wav" # mp3, m4a, wav
 
-  # Normalize audio levels
-  normalize: true
+  # Normalise audio loudness to target LUFS (Loudness Units relative to Full Scale)
+  # -16 = broadcast standard for most content
+  # -23 = EBU R128 standard (European broadcast)
+  # -14 = streaming platforms (Spotify, etc.)
+  # Set to null to disable normalisation completely
+  normalise_lufs: -16
 
 # Scheduling Configuration
 scheduler:

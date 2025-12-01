@@ -1,6 +1,6 @@
 """
 Audio Processing Module for BBC News Bulletin Scraper
-Handles audio trimming, format conversion, and quality normalization.
+Handles audio trimming, format conversion, and normalisation.
 """
 
 import logging
@@ -29,13 +29,25 @@ class AudioProcessor:
         """
         try:
             # Get processing parameters
-            trim_seconds = self.audio_config.get("trim_start_seconds", 0)
-            normalize = self.audio_config.get("normalize", True)
+            trim_start_seconds = self.audio_config.get("trim_start_seconds", 0)
+            trim_end_seconds = self.audio_config.get("trim_end_seconds", 0)
+            normalise_lufs = self.audio_config.get("normalise_lufs")
+            # Support legacy normalize/normalise boolean setting
+            if normalise_lufs is None:
+                legacy_normalise = self.audio_config.get(
+                    "normalise", False
+                ) or self.audio_config.get("normalize", False)
+                normalise_lufs = -16 if legacy_normalise else None
             output_format = self.audio_config.get("format", "mp3")
 
             # Build ffmpeg command
             cmd = self._build_ffmpeg_command(
-                input_file, output_file, trim_seconds, normalize, output_format
+                input_file,
+                output_file,
+                trim_start_seconds,
+                trim_end_seconds,
+                normalise_lufs,
+                output_format,
             )
 
             logging.info(f"Processing audio: {input_file} -> {output_file}")
@@ -64,8 +76,9 @@ class AudioProcessor:
         self,
         input_file: Path,
         output_file: Path,
-        trim_seconds: float,
-        normalize: bool,
+        trim_start_seconds: float,
+        trim_end_seconds: float,
+        normalise_lufs: float | None,
         output_format: str,
     ) -> list:
         """Build ffmpeg command with specified parameters."""
@@ -78,12 +91,32 @@ class AudioProcessor:
         filters = []
 
         # Trim from start if specified
-        if trim_seconds > 0:
-            cmd.extend(["-ss", str(trim_seconds)])
+        if trim_start_seconds > 0:
+            cmd.extend(["-ss", str(trim_start_seconds)])
 
-        # Normalize audio levels if enabled
-        if normalize:
-            filters.append("loudnorm")
+        # Trim from end if specified (using -t duration instead of -to end time)
+        if trim_end_seconds > 0:
+            # We need to calculate duration: original_duration - trim_start - trim_end
+            # Get input duration first
+            input_duration = self.get_duration(input_file)
+            if input_duration:
+                target_duration = input_duration - trim_start_seconds - trim_end_seconds
+                if target_duration > 0:
+                    cmd.extend(["-t", str(target_duration)])
+                else:
+                    logging.warning(
+                        f"Calculated target duration ({target_duration}s) is invalid for {input_file}, skipping end trim"
+                    )
+            else:
+                logging.warning(
+                    f"Could not determine duration of {input_file}, skipping end trim"
+                )
+
+        # Normalise audio loudness if enabled with specific LUFS target
+        if normalise_lufs is not None:
+            # Use loudnorm filter for proper loudness normalisation
+            # This normalises to the target LUFS level using EBU R128 algorithm
+            filters.append(f"loudnorm=I={normalise_lufs}:TP=-1.0:LRA=7.0")
 
         # Apply filters if any
         if filters:
