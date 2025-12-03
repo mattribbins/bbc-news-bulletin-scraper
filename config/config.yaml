@@ -8,12 +8,15 @@ app:
 
 # BBC Programme Configuration
 programmes:
-  # Example bulletins
+  # Example bulletins with programme-specific trim settings
   - name: "BBC Somerset Update"
     url: "https://www.bbc.co.uk/programmes/p08dy4zh"
     output_name: "somerset_update"
     pid_recursive: true
     enabled: true
+    # Programme-specific trim settings (optional - overrides global settings)
+    trim_start_seconds: 4.4
+    trim_end_seconds: 0.0
 
   # Additional programmes can be added here
   - name: "BBC Bristol Update"
@@ -21,13 +24,18 @@ programmes:
     output_name: "bristol_update"
     pid_recursive: true
     enabled: true
+    # Different trim settings for this programme
+    trim_start_seconds: 5.0
+    trim_end_seconds: 2.0
 
 # Audio Processing Settings
 audio:
-  # Trim seconds from the start of each bulletin
+  # Default trim seconds from the start of each bulletin
+  # Can be overridden per programme by adding trim_start_seconds to programme config
   trim_start_seconds: 4.4
 
-  # Trim seconds from the end of each bulletin
+  # Default trim seconds from the end of each bulletin
+  # Can be overridden per programme by adding trim_end_seconds to programme config
   trim_end_seconds: 0.0
 
   # Audio quality settings (for mp3/m4a)

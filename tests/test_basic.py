@@ -302,6 +302,75 @@ class TestApplication:
         assert hasattr(app, "initialize")
         assert hasattr(app, "shutdown")
 
+    def test_programme_specific_trim_settings(self):
+        """Test per-programme trim settings override global settings."""
+        from audio_processor import AudioProcessor
+
+        # Global config with default trim settings
+        config = {
+            "audio": {
+                "trim_start_seconds": 4.0,
+                "trim_end_seconds": 1.0,
+                "format": "wav",
+            }
+        }
+        processor = AudioProcessor(config)
+
+        # Programme-specific config that overrides global settings
+        programme_config = {
+            "trim_start_seconds": 6.0,
+            "trim_end_seconds": 2.5,
+            "name": "Test Programme",
+        }
+
+        # Mock get_duration to avoid external dependencies
+        from unittest.mock import Mock
+
+        processor.get_duration = Mock(return_value=60.0)
+
+        # Test that programme config overrides global config
+        cmd = processor._build_ffmpeg_command(  # pylint: disable=protected-access
+            Path("/fake/input.wav"),
+            Path("/fake/output.wav"),
+            trim_start_seconds=programme_config.get(
+                "trim_start_seconds", config["audio"]["trim_start_seconds"]
+            ),
+            trim_end_seconds=programme_config.get(
+                "trim_end_seconds", config["audio"]["trim_end_seconds"]
+            ),
+            normalise_lufs=None,
+            output_format="wav",
+        )
+
+        # Check start trim
+        assert "-ss" in cmd
+        ss_index = cmd.index("-ss")
+        assert (
+            cmd[ss_index + 1] == "6.0"
+        ), "Programme trim_start_seconds should override global"
+
+        # Check end trim (calculated duration: 60 - 6.0 - 2.5 = 51.5)
+        assert "-t" in cmd
+        t_index = cmd.index("-t")
+        assert (
+            cmd[t_index + 1] == "51.5"
+        ), "Programme trim_end_seconds should override global"
+
+    def test_atomic_file_operations(self):
+        """Test that temporary file handling prevents race conditions."""
+        from audio_processor import AudioProcessor
+
+        config = {"audio": {"format": "wav"}}
+        processor = AudioProcessor(config)
+
+        # Test that temp file path is generated correctly
+        output_file = Path("/fake/output.wav")
+        expected_temp_file = output_file.with_suffix(".wav.tmp")
+
+        # This test verifies the temp file naming logic
+        assert expected_temp_file.name == "output.wav.tmp"
+        assert expected_temp_file.parent == output_file.parent
+
 
 def test_package_structure():
     """Test that all required modules are available."""

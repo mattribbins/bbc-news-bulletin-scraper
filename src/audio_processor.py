@@ -16,21 +16,35 @@ class AudioProcessor:
         self.config = config
         self.audio_config = config.get("audio", {})
 
-    def process_audio(self, input_file: Path, output_file: Path) -> bool:
+    def process_audio(
+        self,
+        input_file: Path,
+        output_file: Path,
+        programme_config: Optional[dict] = None,
+    ) -> bool:
         """
         Process audio file with trimming and format conversion.
 
         Args:
             input_file: Path to input audio file
             output_file: Path to output audio file
+            programme_config: Programme-specific config (optional, overrides global settings)
 
         Returns:
             bool: True if processing successful, False otherwise
         """
+        # Create temporary file in same directory as output to ensure atomic move works
+        temp_file = output_file.with_suffix(f"{output_file.suffix}.tmp")
+
         try:
-            # Get processing parameters
-            trim_start_seconds = self.audio_config.get("trim_start_seconds", 0)
-            trim_end_seconds = self.audio_config.get("trim_end_seconds", 0)
+            # Get processing parameters - programme config overrides global config
+            trim_start_seconds = (programme_config or {}).get(
+                "trim_start_seconds", self.audio_config.get("trim_start_seconds", 0)
+            )
+            trim_end_seconds = (programme_config or {}).get(
+                "trim_end_seconds", self.audio_config.get("trim_end_seconds", 0)
+            )
+
             normalise_lufs = self.audio_config.get("normalise_lufs")
             # Support legacy normalize/normalise boolean setting
             if normalise_lufs is None:
@@ -40,10 +54,10 @@ class AudioProcessor:
                 normalise_lufs = -16 if legacy_normalise else None
             output_format = self.audio_config.get("format", "mp3")
 
-            # Build ffmpeg command
+            # Build ffmpeg command - process to temporary file
             cmd = self._build_ffmpeg_command(
                 input_file,
-                output_file,
+                temp_file,  # Use temporary file as output
                 trim_start_seconds,
                 trim_end_seconds,
                 normalise_lufs,
@@ -59,17 +73,29 @@ class AudioProcessor:
             )
 
             if result.returncode == 0:
+                # Atomically move temporary file to final destination
+                # This prevents the race condition where a 0-byte file appears before processing completes
+                temp_file.replace(output_file)
                 logging.info(f"Audio processing completed: {output_file}")
                 return True
             else:
                 logging.error(f"FFmpeg failed: {result.stderr}")
+                # Clean up temporary file on failure
+                if temp_file.exists():
+                    temp_file.unlink()
                 return False
 
         except subprocess.TimeoutExpired:
             logging.error("Audio processing timed out")
+            # Clean up temporary file on timeout
+            if temp_file.exists():
+                temp_file.unlink()
             return False
         except Exception as e:
             logging.error(f"Audio processing error: {e}")
+            # Clean up temporary file on error
+            if temp_file.exists():
+                temp_file.unlink()
             return False
 
     def _build_ffmpeg_command(
