@@ -365,11 +365,56 @@ class TestApplication:
 
         # Test that temp file path is generated correctly
         output_file = Path("/fake/output.wav")
-        expected_temp_file = output_file.with_suffix(".wav.tmp")
+        expected_temp_file = output_file.with_suffix(".processing")
 
         # This test verifies the temp file naming logic
-        assert expected_temp_file.name == "output.wav.tmp"
+        assert expected_temp_file.name == "output.processing"
         assert expected_temp_file.parent == output_file.parent
+
+        # Verify the temporary file uses .processing extension to prevent ingest tool conflicts
+        assert expected_temp_file.suffix == ".processing"
+
+    def test_explicit_format_specification(self):
+        """Test that FFmpeg command includes explicit format specification."""
+        from audio_processor import AudioProcessor
+
+        config = {"audio": {"format": "wav"}}
+        processor = AudioProcessor(config)
+
+        # Build command and check for explicit format specification
+        cmd = processor._build_ffmpeg_command(  # pylint: disable=protected-access
+            Path("/fake/input.m4a"),
+            Path("/fake/output.processing"),
+            trim_start_seconds=0,
+            trim_end_seconds=0,
+            normalise_lufs=None,
+            output_format="wav",
+        )
+
+        # Check that -f wav is present in the command
+        assert "-f" in cmd
+        f_index = cmd.index("-f")
+        assert (
+            cmd[f_index + 1] == "wav"
+        ), "Explicit format specification should be present"
+
+        # Test with different formats
+        for output_format in ["mp3", "m4a", "wav"]:
+            cmd_format = (
+                processor._build_ffmpeg_command(  # pylint: disable=protected-access
+                    Path("/fake/input.m4a"),
+                    Path("/fake/output.processing"),
+                    trim_start_seconds=0,
+                    trim_end_seconds=0,
+                    normalise_lufs=None,
+                    output_format=output_format,
+                )
+            )
+            assert "-f" in cmd_format
+            f_idx = cmd_format.index("-f")
+            assert (
+                cmd_format[f_idx + 1] == output_format
+            ), f"Format {output_format} should be specified"
 
 
 def test_package_structure():

@@ -124,17 +124,7 @@ class BBCBulletinScraper:
             try:
                 logging.info("Attempting to trigger startup download...")
                 if self.scheduler is not None:
-                    # Try both the scheduled approach and immediate approach
                     self.scheduler.trigger_immediate_download()
-
-                    # Also try immediate download for testing
-                    logging.info("Also attempting immediate synchronous download...")
-                    success = self.scheduler.download_now()
-                    if success:
-                        logging.info("Immediate download completed successfully")
-                    else:
-                        logging.warning("Immediate download failed")
-
                     logging.info("Startup download trigger completed")
                 else:
                     logging.error("Scheduler is None - cannot trigger startup download")

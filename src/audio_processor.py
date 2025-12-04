@@ -4,7 +4,9 @@ Handles audio trimming, format conversion, and normalisation.
 """
 
 import logging
+import os
 import subprocess
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -33,10 +35,35 @@ class AudioProcessor:
         Returns:
             bool: True if processing successful, False otherwise
         """
-        # Create temporary file in same directory as output to ensure atomic move works
-        temp_file = output_file.with_suffix(f"{output_file.suffix}.tmp")
+        # Create lock file to prevent concurrent processing of same output
+        lock_file = output_file.with_suffix(".lock")
+
+        # Check if output file already exists and is recent
+        if output_file.exists():
+            logging.info(f"Output file already exists: {output_file}")
+            return True
+
+        # Try to acquire lock
+        try:
+            lock_fd = os.open(str(lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            logging.info(
+                f"Another process is already processing {output_file}, skipping"
+            )
+            return True  # Consider this success since another process is handling it
 
         try:
+            # Create temporary file in same directory as output to ensure atomic move works
+            # Use unique identifier to prevent race conditions between concurrent processes
+            unique_id = uuid.uuid4().hex[:8]
+            temp_file = output_file.with_suffix(f".processing.{unique_id}")
+
+            # Double-check output file doesn't exist after acquiring lock
+            if output_file.exists():
+                logging.info(
+                    f"Output file created while waiting for lock: {output_file}"
+                )
+                return True
             # Get processing parameters - programme config overrides global config
             trim_start_seconds = (programme_config or {}).get(
                 "trim_start_seconds", self.audio_config.get("trim_start_seconds", 0)
@@ -67,36 +94,46 @@ class AudioProcessor:
             logging.info(f"Processing audio: {input_file} -> {output_file}")
             logging.debug(f"FFmpeg command: {' '.join(cmd)}")
 
-            # Execute ffmpeg
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=300  # 5 minute timeout
-            )
+            try:
+                # Execute ffmpeg
+                result = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=300  # 5 minute timeout
+                )
 
-            if result.returncode == 0:
-                # Atomically move temporary file to final destination
-                # This prevents the race condition where a 0-byte file appears before processing completes
-                temp_file.replace(output_file)
-                logging.info(f"Audio processing completed: {output_file}")
-                return True
-            else:
-                logging.error(f"FFmpeg failed: {result.stderr}")
-                # Clean up temporary file on failure
+                if result.returncode == 0:
+                    # Atomically move temporary file to final destination
+                    # This prevents the race condition where a 0-byte file appears before processing completes
+                    temp_file.replace(output_file)
+                    logging.info(f"Audio processing completed: {output_file}")
+                    return True
+                else:
+                    logging.error(f"FFmpeg failed: {result.stderr}")
+                    # Clean up temporary file on failure
+                    if temp_file.exists():
+                        temp_file.unlink()
+                    return False
+
+            except subprocess.TimeoutExpired:
+                logging.error("Audio processing timed out")
+                # Clean up temporary file on timeout
+                if temp_file.exists():
+                    temp_file.unlink()
+                return False
+            except Exception as e:
+                logging.error(f"Audio processing error: {e}")
+                # Clean up temporary file on error
                 if temp_file.exists():
                     temp_file.unlink()
                 return False
 
-        except subprocess.TimeoutExpired:
-            logging.error("Audio processing timed out")
-            # Clean up temporary file on timeout
-            if temp_file.exists():
-                temp_file.unlink()
-            return False
-        except Exception as e:
-            logging.error(f"Audio processing error: {e}")
-            # Clean up temporary file on error
-            if temp_file.exists():
-                temp_file.unlink()
-            return False
+        finally:
+            # Clean up lock file
+            try:
+                os.close(lock_fd)
+                if lock_file.exists():
+                    lock_file.unlink()
+            except Exception as e:
+                logging.warning(f"Failed to clean up lock file: {e}")
 
     def _build_ffmpeg_command(
         self,
@@ -162,6 +199,9 @@ class AudioProcessor:
 
         # Remove video streams (audio only)
         cmd.extend(["-vn"])
+
+        # Explicitly specify output format to handle non-standard temporary file extensions
+        cmd.extend(["-f", output_format])
 
         # Output file
         cmd.append(str(output_file))
