@@ -1,13 +1,17 @@
 # BBC News Bulletin Scraper - Alpine Version (Default)
 FROM python:3.11-alpine
 
-# Install system dependencies
+# Update package index and install core dependencies
 RUN apk update && apk add --no-cache \
-    # Core dependencies
     curl \
     wget \
+    bash \
+    dcron \
+    rsync
+
+# Install Perl and required modules
+RUN apk add --no-cache \
     perl \
-    # Perl modules required by get_iplayer
     perl-libwww \
     perl-xml-libxml \
     perl-mojolicious \
@@ -16,13 +20,10 @@ RUN apk update && apk add --no-cache \
     perl-html-parser \
     perl-uri \
     perl-file-slurp \
-    perl-json \
-    # Audio processing (much smaller in Alpine)
-    ffmpeg \
-    # Utilities
-    dcron \
-    rsync \
-    bash
+    perl-json
+
+# Install ffmpeg (audio processing)
+RUN apk add --no-cache ffmpeg
 
 # Install get_iplayer
 RUN curl -fsSL https://raw.githubusercontent.com/get-iplayer/get_iplayer/master/get_iplayer -o /usr/local/bin/get_iplayer \
