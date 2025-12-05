@@ -20,13 +20,14 @@ jobs:
     strategy:
       matrix:
         variant:
-          - name: alpine
-            dockerfile: Dockerfile
-            tags-suffix: ""
-            tags-extra: "alpine"
+          # Temporarily disabled Alpine build due to multi-arch build issues
+          # - name: alpine
+          #   dockerfile: Dockerfile
+          #   tags-suffix: ""
+          #   tags-extra: "alpine"
           - name: debian
             dockerfile: Dockerfile.debian
-            tags-suffix: "-debian"
+            tags-suffix: ""
             tags-extra: "debian"
 
     steps:
@@ -55,7 +56,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},suffix=${{ matrix.variant.tags-suffix }}
             type=semver,pattern={{major}},suffix=${{ matrix.variant.tags-suffix }}
             type=raw,value=${{ matrix.variant.tags-extra }}
-            type=raw,value=latest,enable=${{ matrix.variant.name == 'alpine' }}
+            type=raw,value=latest,enable=${{ matrix.variant.name == 'debian' }}
 
       - name: Build and push ${{ matrix.variant.name }} image
         uses: docker/build-push-action@v5
@@ -106,14 +107,14 @@ jobs:
           echo "" >> CHANGELOG.md
           echo "## Docker Images" >> CHANGELOG.md
           echo "" >> CHANGELOG.md
-          echo "### Alpine (Recommended)" >> CHANGELOG.md
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\` (Alpine)" >> CHANGELOG.md
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpine\`" >> CHANGELOG.md
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$CURRENT_TAG\` (Alpine)" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "### Debian (Compatibility)" >> CHANGELOG.md
+          echo "### Debian (Primary)" >> CHANGELOG.md
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\` (Debian)" >> CHANGELOG.md
           echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:debian\`" >> CHANGELOG.md
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$CURRENT_TAG-debian\`" >> CHANGELOG.md
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$CURRENT_TAG\` (Debian)" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "### Alpine (Temporarily Disabled)" >> CHANGELOG.md
+          echo "- Alpine builds temporarily disabled due to multi-arch build issues" >> CHANGELOG.md
+          echo "- Will be re-enabled when emulation trigger errors are resolved" >> CHANGELOG.md
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
