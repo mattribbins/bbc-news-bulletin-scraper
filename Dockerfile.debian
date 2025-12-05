@@ -1,5 +1,5 @@
 # BBC News Bulletin Scraper - Debian Version
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 # Install only essential system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
