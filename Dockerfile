@@ -2,7 +2,7 @@
 FROM python:3.11-alpine
 
 # Install system dependencies
-RUN apk add --no-cache \
+RUN apk update && apk add --no-cache \
     # Core dependencies
     curl \
     wget \
