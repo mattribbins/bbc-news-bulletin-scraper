@@ -369,7 +369,7 @@ class BBCScraper:
             output_file.parent.mkdir(parents=True, exist_ok=True)
 
             # Process audio (trim, convert, normalise)
-            if self.audio_processor.process_audio(input_file, output_file):
+            if self.audio_processor.process_audio(input_file, output_file, programme):
                 # Clean up temp file
                 self._cleanup_temp_file(input_file)
 

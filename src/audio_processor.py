@@ -4,7 +4,10 @@ Handles audio trimming, format conversion, and normalisation.
 """
 
 import logging
+import os
 import subprocess
+import time
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -16,21 +19,88 @@ class AudioProcessor:
         self.config = config
         self.audio_config = config.get("audio", {})
 
-    def process_audio(self, input_file: Path, output_file: Path) -> bool:
+    def process_audio(
+        self,
+        input_file: Path,
+        output_file: Path,
+        programme_config: Optional[dict] = None,
+    ) -> bool:
         """
         Process audio file with trimming and format conversion.
 
         Args:
             input_file: Path to input audio file
             output_file: Path to output audio file
+            programme_config: Programme-specific config (optional, overrides global settings)
 
         Returns:
             bool: True if processing successful, False otherwise
         """
+        # Create lock file to prevent concurrent processing of same output
+        lock_file = output_file.with_suffix(".lock")
+
+        # Check if output file already exists and is recent
+        if output_file.exists():
+            logging.info(f"Output file already exists: {output_file}")
+            return True
+
+        # Try to acquire lock with stale lock detection
         try:
-            # Get processing parameters
-            trim_start_seconds = self.audio_config.get("trim_start_seconds", 0)
-            trim_end_seconds = self.audio_config.get("trim_end_seconds", 0)
+            lock_fd = os.open(str(lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            # Check if the lock file is stale (older than 10 minutes)
+            if lock_file.exists():
+                lock_age = time.time() - lock_file.stat().st_mtime
+                if lock_age > 600:  # 10 minutes
+                    logging.warning(
+                        f"Removing stale lock file (age: {lock_age:.1f}s): {lock_file}"
+                    )
+                    try:
+                        lock_file.unlink()
+                        # Try to acquire lock again after removing stale lock
+                        lock_fd = os.open(
+                            str(lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY
+                        )
+                    except (FileExistsError, OSError) as e:
+                        logging.warning(
+                            f"Could not remove stale lock or re-acquire: {e}"
+                        )
+                        return True
+                else:
+                    logging.info(
+                        f"Another process is processing {output_file} (lock age: {lock_age:.1f}s), skipping"
+                    )
+                    return True  # Consider this success since another process is handling it
+            else:
+                # Race condition: lock file disappeared between check and open
+                try:
+                    lock_fd = os.open(
+                        str(lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY
+                    )
+                except FileExistsError:
+                    logging.info(f"Lock file reappeared for {output_file}, skipping")
+                    return True
+
+        try:
+            # Create temporary file in same directory as output to ensure atomic move works
+            # Use unique identifier to prevent race conditions between concurrent processes
+            unique_id = uuid.uuid4().hex[:8]
+            temp_file = output_file.with_suffix(f".processing.{unique_id}")
+
+            # Double-check output file doesn't exist after acquiring lock
+            if output_file.exists():
+                logging.info(
+                    f"Output file created while waiting for lock: {output_file}"
+                )
+                return True
+            # Get processing parameters - programme config overrides global config
+            trim_start_seconds = (programme_config or {}).get(
+                "trim_start_seconds", self.audio_config.get("trim_start_seconds", 0)
+            )
+            trim_end_seconds = (programme_config or {}).get(
+                "trim_end_seconds", self.audio_config.get("trim_end_seconds", 0)
+            )
+
             normalise_lufs = self.audio_config.get("normalise_lufs")
             # Support legacy normalize/normalise boolean setting
             if normalise_lufs is None:
@@ -40,10 +110,10 @@ class AudioProcessor:
                 normalise_lufs = -16 if legacy_normalise else None
             output_format = self.audio_config.get("format", "mp3")
 
-            # Build ffmpeg command
+            # Build ffmpeg command - process to temporary file
             cmd = self._build_ffmpeg_command(
                 input_file,
-                output_file,
+                temp_file,  # Use temporary file as output
                 trim_start_seconds,
                 trim_end_seconds,
                 normalise_lufs,
@@ -53,24 +123,46 @@ class AudioProcessor:
             logging.info(f"Processing audio: {input_file} -> {output_file}")
             logging.debug(f"FFmpeg command: {' '.join(cmd)}")
 
-            # Execute ffmpeg
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=300  # 5 minute timeout
-            )
+            try:
+                # Execute ffmpeg
+                result = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=300  # 5 minute timeout
+                )
 
-            if result.returncode == 0:
-                logging.info(f"Audio processing completed: {output_file}")
-                return True
-            else:
-                logging.error(f"FFmpeg failed: {result.stderr}")
+                if result.returncode == 0:
+                    # Atomically move temporary file to final destination
+                    # This prevents the race condition where a 0-byte file appears before processing completes
+                    temp_file.replace(output_file)
+                    logging.info(f"Audio processing completed: {output_file}")
+                    return True
+                else:
+                    logging.error(f"FFmpeg failed: {result.stderr}")
+                    # Clean up temporary file on failure
+                    if temp_file.exists():
+                        temp_file.unlink()
+                    return False
+
+            except subprocess.TimeoutExpired:
+                logging.error("Audio processing timed out")
+                # Clean up temporary file on timeout
+                if temp_file.exists():
+                    temp_file.unlink()
+                return False
+            except Exception as e:
+                logging.error(f"Audio processing error: {e}")
+                # Clean up temporary file on error
+                if temp_file.exists():
+                    temp_file.unlink()
                 return False
 
-        except subprocess.TimeoutExpired:
-            logging.error("Audio processing timed out")
-            return False
-        except Exception as e:
-            logging.error(f"Audio processing error: {e}")
-            return False
+        finally:
+            # Clean up lock file
+            try:
+                os.close(lock_fd)
+                if lock_file.exists():
+                    lock_file.unlink()
+            except Exception as e:
+                logging.warning(f"Failed to clean up lock file: {e}")
 
     def _build_ffmpeg_command(
         self,
@@ -136,6 +228,9 @@ class AudioProcessor:
 
         # Remove video streams (audio only)
         cmd.extend(["-vn"])
+
+        # Explicitly specify output format to handle non-standard temporary file extensions
+        cmd.extend(["-f", output_format])
 
         # Output file
         cmd.append(str(output_file))

@@ -1,34 +1,25 @@
-# BBC News Bulletin Scraper - Alpine Version (Default)
-FROM python:3.11-alpine
+# BBC News Bulletin Scraper - Debian Version
+FROM python:3.11-slim
 
-# Install system dependencies
-RUN apk add --no-cache \
+# Install only essential system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     # Core dependencies
     curl \
     wget \
     perl \
-    # Perl modules required by get_iplayer
-    perl-libwww \
-    perl-xml-libxml \
-    perl-mojolicious \
-    perl-cgi \
-    perl-lwp-protocol-https \
-    perl-html-parser \
-    perl-uri \
-    perl-file-slurp \
-    perl-json \
-    # Audio processing (much smaller in Alpine)
+    # Minimal Perl modules (only what's absolutely needed)
+    libwww-perl \
+    liblwp-protocol-https-perl \
+    libfile-slurp-perl \
+    libjson-perl \
+    # Minimal audio processing
     ffmpeg \
-    # Utilities
-    dcron \
-    rsync \
-    bash
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Install get_iplayer
 RUN curl -fsSL https://raw.githubusercontent.com/get-iplayer/get_iplayer/master/get_iplayer -o /usr/local/bin/get_iplayer \
-    && chmod +x /usr/local/bin/get_iplayer \
-    # Verify get_iplayer installation
-    && get_iplayer --help > /dev/null 2>&1 || echo "get_iplayer installed but may need additional setup"
+    && chmod +x /usr/local/bin/get_iplayer
 
 # Set working directory
 WORKDIR /app
@@ -51,7 +42,7 @@ ENV PYTHONPATH=/app
 ENV TZ=Europe/London
 
 # Create non-root user for security
-RUN adduser -D -s /bin/bash appuser && \
+RUN useradd -r -m -s /bin/bash appuser && \
     chown -R appuser:appuser /app
 USER appuser
 

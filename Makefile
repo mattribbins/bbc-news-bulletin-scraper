@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test lint format check build run clean docker-build docker-run
+.PHONY: help install install-dev test lint format check build run clean docker-build docker-build-alpine docker-build-debian docker-build-all docker-run
 
 # Default target
 help:
@@ -13,8 +13,10 @@ help:
 	@echo "  build       - Build the package"
 	@echo "  run         - Run the application locally"
 	@echo "  clean       - Clean build artifacts"
-	@echo "  docker-build - Build Docker image"
-	@echo "  docker-run  - Run with Docker Compose"
+	@echo "  docker-build        - Build default Docker image (Alpine)"
+	@echo "  docker-build-alpine - Build Alpine Docker image (default, smaller)"
+	@echo "  docker-build-debian - Build Debian Docker image (compatibility)"
+	@echo "  docker-run          - Run with Docker Compose"
 
 # Installation
 install:
@@ -66,8 +68,22 @@ clean:
 	find . -type f -name "*.pyc" -delete
 
 # Docker commands
-docker-build:
-	docker compose build
+docker-build: docker-build-alpine
+	@echo "Built default (Alpine) Docker image"
+
+docker-build-alpine:
+	docker build -t bbc-news-bulletin-scraper:latest .
+	docker tag bbc-news-bulletin-scraper:latest bbc-news-bulletin-scraper:alpine
+
+docker-build-debian:
+	docker build -f Dockerfile.debian -t bbc-news-bulletin-scraper:debian .
+
+docker-build-all: docker-build-alpine docker-build-debian
+	@echo "Built both Alpine and Debian variants"
+	@echo "Available tags:"
+	@echo "  bbc-news-bulletin-scraper:latest (Alpine)"
+	@echo "  bbc-news-bulletin-scraper:alpine"
+	@echo "  bbc-news-bulletin-scraper:debian"
 
 docker-run:
 	docker compose up -d
