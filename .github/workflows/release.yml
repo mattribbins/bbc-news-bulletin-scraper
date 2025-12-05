@@ -58,7 +58,7 @@ jobs:
             type=raw,value=latest,enable=${{ matrix.variant.name == 'alpine' }}
 
       - name: Build and push ${{ matrix.variant.name }} image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.variant.dockerfile }}
