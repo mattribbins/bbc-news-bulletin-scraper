@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Minimal Perl modules (only what's absolutely needed)
     libwww-perl \
     liblwp-protocol-https-perl \
+    libfile-slurp-perl \
     libjson-perl \
     # Minimal audio processing
     ffmpeg \

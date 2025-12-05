@@ -139,5 +139,5 @@ jobs:
 
       - name: Compare image sizes
         run: |
-          echo "Alpine size: $(docker images test-alpine --format 'table {{.Size}}')"
-          echo "Debian size: $(docker images test-debian --format 'table {{.Size}}')"
+          echo "Alpine size: $(docker images test-alpine --format '{{.Size}}')"
+          echo "Debian size: $(docker images test-debian --format '{{.Size}}')"

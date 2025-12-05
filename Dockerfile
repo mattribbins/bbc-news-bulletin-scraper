@@ -15,6 +15,7 @@ RUN apk add --no-cache \
     perl-lwp-protocol-https \
     perl-html-parser \
     perl-uri \
+    perl-file-slurp \
     perl-json \
     # Audio processing (much smaller in Alpine)
     ffmpeg \

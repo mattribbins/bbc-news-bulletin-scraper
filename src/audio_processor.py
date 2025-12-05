@@ -6,6 +6,7 @@ Handles audio trimming, format conversion, and normalisation.
 import logging
 import os
 import subprocess
+import time
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -43,14 +44,42 @@ class AudioProcessor:
             logging.info(f"Output file already exists: {output_file}")
             return True
 
-        # Try to acquire lock
+        # Try to acquire lock with stale lock detection
         try:
             lock_fd = os.open(str(lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
-            logging.info(
-                f"Another process is already processing {output_file}, skipping"
-            )
-            return True  # Consider this success since another process is handling it
+            # Check if the lock file is stale (older than 10 minutes)
+            if lock_file.exists():
+                lock_age = time.time() - lock_file.stat().st_mtime
+                if lock_age > 600:  # 10 minutes
+                    logging.warning(
+                        f"Removing stale lock file (age: {lock_age:.1f}s): {lock_file}"
+                    )
+                    try:
+                        lock_file.unlink()
+                        # Try to acquire lock again after removing stale lock
+                        lock_fd = os.open(
+                            str(lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY
+                        )
+                    except (FileExistsError, OSError) as e:
+                        logging.warning(
+                            f"Could not remove stale lock or re-acquire: {e}"
+                        )
+                        return True
+                else:
+                    logging.info(
+                        f"Another process is processing {output_file} (lock age: {lock_age:.1f}s), skipping"
+                    )
+                    return True  # Consider this success since another process is handling it
+            else:
+                # Race condition: lock file disappeared between check and open
+                try:
+                    lock_fd = os.open(
+                        str(lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY
+                    )
+                except FileExistsError:
+                    logging.info(f"Lock file reappeared for {output_file}, skipping")
+                    return True
 
         try:
             # Create temporary file in same directory as output to ensure atomic move works
