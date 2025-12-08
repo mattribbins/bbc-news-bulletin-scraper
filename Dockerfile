@@ -2,12 +2,27 @@
 FROM python:3.11-alpine
 
 # Update package index and install core dependencies
-RUN apk update && apk add --no-cache \
+# Use proper error handling for trigger execution errors in emulated ARM64 builds
+RUN set +e && \
+    apk update && apk add --no-cache \
     curl \
     wget \
     bash \
     dcron \
-    rsync
+    rsync; \
+    exit_code=$?; \
+    if [ $exit_code -eq 2 ]; then \
+    # Validate that all required packages are actually installed despite trigger errors
+    if apk info -e curl wget bash dcron rsync >/dev/null 2>&1; then \
+    echo "All required packages installed successfully despite trigger errors"; \
+    exit 0; \
+    else \
+    echo "Package installation failed - required packages missing"; \
+    exit $exit_code; \
+    fi; \
+    elif [ $exit_code -ne 0 ]; then \
+    exit $exit_code; \
+    fi
 
 # Install Perl and required modules
 RUN apk add --no-cache \
