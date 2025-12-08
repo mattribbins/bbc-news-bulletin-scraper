@@ -44,7 +44,7 @@ RUN apk add --no-cache ffmpeg
 RUN curl -fsSL https://raw.githubusercontent.com/get-iplayer/get_iplayer/master/get_iplayer -o /usr/local/bin/get_iplayer \
     && chmod +x /usr/local/bin/get_iplayer \
     # Verify get_iplayer installation
-    && get_iplayer --help > /dev/null 2>&1 || echo "get_iplayer installed but may need additional setup"
+    && get_iplayer --help > /dev/null 2>&1 || (echo "get_iplayer verification failed" && exit 1)
 
 # Set working directory
 WORKDIR /app

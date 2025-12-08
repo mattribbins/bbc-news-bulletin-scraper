@@ -7,19 +7,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     perl \
-    # Minimal Perl modules (only what's absolutely needed)
+    # Perl modules required by get_iplayer
     libwww-perl \
     liblwp-protocol-https-perl \
     libfile-slurp-perl \
     libjson-perl \
-    # Minimal audio processing
+    libxml-libxml-perl \
+    libmojolicious-perl \
+    libhtml-parser-perl \
+    liburi-perl \
+    libcgi-pm-perl \
+    # Audio processing
     ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
 # Install get_iplayer
 RUN curl -fsSL https://raw.githubusercontent.com/get-iplayer/get_iplayer/master/get_iplayer -o /usr/local/bin/get_iplayer \
-    && chmod +x /usr/local/bin/get_iplayer
+    && chmod +x /usr/local/bin/get_iplayer \
+    # Verify get_iplayer installation
+    && get_iplayer --help > /dev/null 2>&1 || (echo "get_iplayer verification failed" && exit 1)
 
 # Set working directory
 WORKDIR /app
