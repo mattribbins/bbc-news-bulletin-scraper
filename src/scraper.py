@@ -4,6 +4,7 @@ Handles downloading BBC programmes using get_iplayer and processing them.
 """
 
 import logging
+import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -59,8 +60,25 @@ class BBCScraper:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Verify get_iplayer is available
+        # Persistent record of PIDs we have already processed
+        self.processed_pids_file = self.cache_dir / "processed_pids.txt"
+
+        # Verify get_iplayer is available before touching any files
         self._verify_get_iplayer()
+
+        # Clear stale downloads only once dependencies are confirmed healthy
+        self._clear_downloads()
+
+    def _clear_downloads(self) -> None:
+        """Remove all files from the downloads directory on startup."""
+        audio_extensions = {".mp3", ".m4a", ".wav", ".aac"}
+        for file_path in self.temp_dir.iterdir():
+            if file_path.suffix in audio_extensions:
+                try:
+                    file_path.unlink()
+                    logging.debug("Cleared stale download: %s", file_path.name)
+                except Exception as e:
+                    logging.warning("Failed to clear %s: %s", file_path.name, e)
 
     def _verify_get_iplayer(self) -> None:
         """Verify that get_iplayer is installed and accessible."""
@@ -146,16 +164,20 @@ class BBCScraper:
             if result.returncode != 0:
                 logging.debug(f"get_iplayer stderr: {result.stderr[:200]}")
 
-            # Handle result - get_iplayer returns 1 if some episodes fail, but others may succeed
+            # get_iplayer return codes:
+            # 0 = all succeeded, 1 = partial success, 6 = all failed (but files may still exist
+            # if some episodes downloaded before others 404'd). We only hard-fail on unexpected
+            # codes where no files could possibly have been written.
             if result.returncode == 0:
                 logging.info("Download completed for: %s", programme_name)
-            elif result.returncode == 1:
+            elif result.returncode in (1, 6):
                 logging.warning(
-                    f"get_iplayer partial success for {programme_name} (some episodes may have failed)"
+                    f"get_iplayer partial/mixed result for {programme_name} "
+                    f"(code {result.returncode}) - checking for any downloaded files"
                 )
             else:
                 logging.error(
-                    f"get_iplayer failed completely for {programme_name}: {result.stderr}"
+                    f"get_iplayer failed for {programme_name} (code {result.returncode}): {result.stderr}"
                 )
                 return {
                     "programme": programme,
@@ -164,7 +186,7 @@ class BBCScraper:
                     "files": [],
                 }
 
-            # Find downloaded files (works for both success and partial success)
+            # Find downloaded files (works for full success, partial success, and mixed results)
             downloaded_files = self._find_downloaded_files(programme_name)
             logging.debug(
                 f"Found {len(downloaded_files)} downloaded files for {programme_name}"
@@ -254,12 +276,6 @@ class BBCScraper:
         # Add verbose output for debugging
         cmd.append("--verbose")
 
-        # Overwrite existing files to avoid failures
-        cmd.append("--overwrite")
-
-        # Force download even if already in history
-        cmd.append("--force")
-
         # Additional options from config
         extra_options = self.get_iplayer_config.get("extra_options", [])
         if extra_options:
@@ -275,8 +291,6 @@ class BBCScraper:
         # Extract PID from URLs like:
         # https://www.bbc.co.uk/programmes/p08dy4zh
         # https://www.bbc.co.uk/programmes/p08m00gv
-        import re
-
         # Match PID pattern (starts with letter, followed by alphanumeric)
         pid_match = re.search(r"/programmes/([a-z][a-z0-9]+)", url)
         if pid_match:
@@ -294,38 +308,58 @@ class BBCScraper:
         return quality_map.get(quality, "std")
 
     def _find_downloaded_files(self, programme_name: str) -> List[Path]:
-        """Find the latest downloaded file for a specific programme."""
+        """Find new (unprocessed) downloaded files for a specific programme.
+
+        Files are matched by programme name keywords and filtered against the
+        processed-PID log to avoid reprocessing the same episode.
+        """
         audio_extensions = [".mp3", ".m4a", ".wav", ".aac"]
         programme_files = []
 
-        # Search in temp directory for recent audio files
+        # Search in temp directory for audio files
         for ext in audio_extensions:
-            pattern = f"*{ext}"
-            for file_path in self.temp_dir.glob(pattern):
+            for file_path in self.temp_dir.glob(f"*{ext}"):
                 # Skip partial/incomplete files
                 if ".partial." in file_path.name or ".hls." in file_path.name:
                     continue
 
-                # Check if file was created recently (within last hour)
-                if self._is_recent_file(file_path):
-                    # Check if filename relates to this programme
-                    filename_lower = file_path.name.lower()
+                filename_lower = file_path.name.lower()
 
-                    # Match by extracting key words from programme name
-                    if self._is_programme_match(filename_lower, programme_name):
-                        programme_files.append(file_path)
+                if not self._is_programme_match(filename_lower, programme_name):
+                    continue
 
-        # Sort by modification time (newest first) and return only the latest
-        if programme_files:
-            programme_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
-            latest_file = [programme_files[0]]  # Return only the most recent
-            logging.info(
-                f"Found latest file for {programme_name}: {latest_file[0].name}"
-            )
-            return latest_file
-        else:
-            logging.info(f"No recent files found for {programme_name}")
+                # Extract PID from filename (e.g. _p0nl8w74_)
+                pid_match = re.search(r"_([a-z][a-z0-9]{7,})_", file_path.name)
+                pid = pid_match.group(1) if pid_match else None
+
+                if pid and self._is_pid_processed(pid):
+                    logging.debug(
+                        "Skipping already-processed PID %s (%s)", pid, file_path.name
+                    )
+                    continue
+
+                programme_files.append((file_path, pid))
+
+        if not programme_files:
+            logging.info("No new files found for %s", programme_name)
             return []
+
+        # Return only the newest unprocessed file
+        programme_files.sort(key=lambda t: t[0].stat().st_mtime, reverse=True)
+        latest_file = programme_files[0][0]
+        logging.info("Found new file for %s: %s", programme_name, latest_file.name)
+        return [latest_file]
+
+    def _is_pid_processed(self, pid: str) -> bool:
+        """Return True if this episode PID has already been processed."""
+        if not self.processed_pids_file.exists():
+            return False
+        return pid in self.processed_pids_file.read_text().splitlines()
+
+    def _mark_pid_processed(self, pid: str) -> None:
+        """Append a PID to the processed-PIDs log."""
+        with self.processed_pids_file.open("a") as f:
+            f.write(pid + "\n")
 
     def _is_programme_match(self, filename_lower: str, programme_name: str) -> bool:
         """Check if filename matches programme name by extracting key identifying words."""
@@ -345,18 +379,6 @@ class BBCScraper:
 
         return False
 
-    def _is_recent_file(self, file_path: Path, max_age_hours: int = 1) -> bool:
-        """Check if file was created recently."""
-        try:
-            from datetime import timedelta
-
-            file_time = datetime.fromtimestamp(file_path.stat().st_mtime)
-            now = datetime.now()
-
-            return (now - file_time) < timedelta(hours=max_age_hours)
-        except Exception:
-            return False
-
     def _process_downloaded_file(
         self, input_file: Path, programme: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
@@ -368,8 +390,16 @@ class BBCScraper:
             # Ensure output directory exists
             output_file.parent.mkdir(parents=True, exist_ok=True)
 
+            # Extract PID from filename to record it as processed
+            pid_match = re.search(r"_([a-z][a-z0-9]{7,})_", input_file.name)
+            pid = pid_match.group(1) if pid_match else None
+
             # Process audio (trim, convert, normalise)
             if self.audio_processor.process_audio(input_file, output_file, programme):
+                # Mark PID so we don't reprocess this episode on the next run
+                if pid:
+                    self._mark_pid_processed(pid)
+
                 # Clean up temp file
                 self._cleanup_temp_file(input_file)
 
