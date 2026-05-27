@@ -89,6 +89,15 @@ scheduler.py (APScheduler cron)
 
 Programmes need a `url` pointing to a BBC series/brand PID (e.g. `https://www.bbc.co.uk/programmes/p08dy4zh`). Set `pid_recursive: true` so get_iplayer fetches individual episodes from the series. `since` and `available_since` control how far back to look.
 
+## Versioning
+
+Version must be kept in sync across two files:
+
+- `pyproject.toml` — `version = "x.y.z"`
+- `src/__init__.py` — `__version__ = "x.y.z"`
+
+`health_monitor.py` reads version from config at runtime; the `"1.0.0"` there is just a fallback default and does not need updating.
+
 ## Releases
 
 Tags matching `v*.*.*` trigger the release workflow, which builds a multi-arch (amd64 + arm64) Debian image and pushes it to ghcr.io, then creates a GitHub Release with an auto-generated changelog. The Alpine build is currently disabled in CI and the release workflow.
