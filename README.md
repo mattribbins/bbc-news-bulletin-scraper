@@ -163,6 +163,32 @@ Logs are written to `/app/logs/scraper.log` with configurable levels:
 - Scheduler execution
 - Health check results
 
+### Enabling debug logs
+
+Set `level: DEBUG` in `config/config.yaml` under the `logging` key:
+
+```yaml
+logging:
+  level: DEBUG
+```
+
+Then restart the container:
+
+```bash
+docker-compose down && docker-compose up -d
+docker-compose logs -f
+```
+
+To enable debug logging for a single run without editing the config file, override the config path with a temporary config that sets `DEBUG`:
+
+```bash
+docker-compose run --rm \
+  -e BBC_CONFIG=/app/config/config-debug.yaml \
+  bbc-news-bull-scraper
+```
+
+Where `config/config-debug.yaml` is a copy of your production config with `level: DEBUG` set.
+
 ## Management Commands
 
 ### Docker Compose Commands

@@ -54,7 +54,8 @@ CI runs these in order: format check → lint → security → test → docker b
 The application downloads BBC radio bulletins on a schedule, processes the audio, and writes a single output file per programme that is overwritten on each new bulletin.
 
 **Data flow:**
-```
+
+```text
 scheduler.py (APScheduler cron) 
   → scraper.py (get_iplayer CLI) 
   → audio_processor.py (ffmpeg) 
@@ -65,7 +66,7 @@ scheduler.py (APScheduler cron)
 
 - `main.py` — wires everything together, handles SIGINT/SIGTERM, detects Docker vs. local paths
 - `config_manager.py` — loads and validates YAML config; searches `config/config-local.yaml` → `config/config.yaml` → `/app/config/config.yaml`
-- `scraper.py` — builds and runs `get_iplayer` commands, handles its return codes (0=ok, 1/6=partial — check for files anyway), tracks processed episode PIDs to prevent reprocessing, clears the downloads directory on startup
+- `scraper.py` — builds and runs `get_iplayer` commands, handles its return codes (0=ok; any non-zero code except the hard-fail set {3,5,7,11,12} is treated as a partial result and files are checked anyway — see "get_iplayer exit codes" below), tracks processed episode PIDs to prevent reprocessing, clears the downloads directory on startup
 - `audio_processor.py` — wraps ffmpeg with atomic writes (UUID temp file → `replace()`) and lock files to prevent race conditions; skips processing if the output file already exists
 - `scheduler.py` — APScheduler background scheduler; optionally triggers a download immediately on startup (`download_on_startup`)
 - `health_monitor.py` — optional HTTP server (default port 8080) with `/health`, `/status`, `/metrics` endpoints
