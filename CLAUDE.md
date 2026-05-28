@@ -73,7 +73,7 @@ scheduler.py (APScheduler cron)
 
 ## Key behaviours to be aware of
 
-**get_iplayer exit codes:** Return code 6 is not a hard failure — it means all episodes in the batch failed (usually expired content), but one or more files may still have downloaded before that. Always check for files on codes 0, 1, and 6.
+**get_iplayer exit codes:** The exit code is `$failcount` — the number of episodes that failed to download. Hard failures (where no files could have been written) are codes `3` (bad args), `5` (bad type), `7` (abort-on-fail), and `11`/`12` (internal errors). Any other non-zero code — including `1`, `6`, `8`, or any higher count — means N episodes failed but files may still be present, so always scan for downloaded files before giving up.
 
 **Episode deduplication:** Processed PIDs are written to `.get_iplayer/processed_pids.txt`. PIDs are extracted from get_iplayer's output filenames (e.g. `News_Update_for_Somerset_-_09_30_Update_p0nldk7z_original.m4a`). `--force` and `--overwrite` are intentionally absent from the get_iplayer command so its own history also prevents re-downloads.
 
