@@ -165,17 +165,20 @@ class BBCScraper:
                 logging.debug(f"get_iplayer stderr: {result.stderr[:200]}")
 
             # get_iplayer return codes:
-            # 0 = all succeeded, 1 = partial success, 6 = all failed (but files may still exist
-            # if some episodes downloaded before others 404'd). We only hard-fail on unexpected
-            # codes where no files could possibly have been written.
+            # 0   = all episodes succeeded
+            # 1   = partial success (some episodes failed)
+            # 3   = bad options / bad search args (config error - hard fail)
+            # 5   = bad programme type (config error - hard fail)
+            # 6   = all episodes in batch failed (files may still exist if some downloaded
+            #       before others 404'd - check for files anyway)
+            # 7   = --download-abortonfail triggered (hard fail)
+            # other codes >0 (not listed above) = $failcount: N episodes matched and all N failed to download; files may
+            #       still be present if any partially completed (treat like code 6)
+            # 11,12 = internal errors (hard fail)
+            _hard_fail_codes = {3, 5, 7, 11, 12}
             if result.returncode == 0:
                 logging.info("Download completed for: %s", programme_name)
-            elif result.returncode in (1, 6):
-                logging.warning(
-                    f"get_iplayer partial/mixed result for {programme_name} "
-                    f"(code {result.returncode}) - checking for any downloaded files"
-                )
-            else:
+            elif result.returncode < 0 or result.returncode in _hard_fail_codes:
                 logging.error(
                     f"get_iplayer failed for {programme_name} (code {result.returncode}): {result.stderr}"
                 )
@@ -185,6 +188,13 @@ class BBCScraper:
                     "error": result.stderr,
                     "files": [],
                 }
+            else:
+                # Any other non-zero code is a fail-count or partial result;
+                # files may still have downloaded, so fall through to scan for them.
+                logging.warning(
+                    f"get_iplayer partial/mixed result for {programme_name} "
+                    f"(code {result.returncode}) - checking for any downloaded files"
+                )
 
             # Find downloaded files (works for full success, partial success, and mixed results)
             downloaded_files = self._find_downloaded_files(programme_name)

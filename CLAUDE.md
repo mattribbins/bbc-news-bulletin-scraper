@@ -54,7 +54,8 @@ CI runs these in order: format check → lint → security → test → docker b
 The application downloads BBC radio bulletins on a schedule, processes the audio, and writes a single output file per programme that is overwritten on each new bulletin.
 
 **Data flow:**
-```
+
+```text
 scheduler.py (APScheduler cron) 
   → scraper.py (get_iplayer CLI) 
   → audio_processor.py (ffmpeg) 
@@ -65,14 +66,14 @@ scheduler.py (APScheduler cron)
 
 - `main.py` — wires everything together, handles SIGINT/SIGTERM, detects Docker vs. local paths
 - `config_manager.py` — loads and validates YAML config; searches `config/config-local.yaml` → `config/config.yaml` → `/app/config/config.yaml`
-- `scraper.py` — builds and runs `get_iplayer` commands, handles its return codes (0=ok, 1/6=partial — check for files anyway), tracks processed episode PIDs to prevent reprocessing, clears the downloads directory on startup
+- `scraper.py` — builds and runs `get_iplayer` commands, handles its return codes (0=ok; any non-zero code except the hard-fail set {3,5,7,11,12} is treated as a partial result and files are checked anyway — see "get_iplayer exit codes" below), tracks processed episode PIDs to prevent reprocessing, clears the downloads directory on startup
 - `audio_processor.py` — wraps ffmpeg with atomic writes (UUID temp file → `replace()`) and lock files to prevent race conditions; skips processing if the output file already exists
 - `scheduler.py` — APScheduler background scheduler; optionally triggers a download immediately on startup (`download_on_startup`)
 - `health_monitor.py` — optional HTTP server (default port 8080) with `/health`, `/status`, `/metrics` endpoints
 
 ## Key behaviours to be aware of
 
-**get_iplayer exit codes:** Return code 6 is not a hard failure — it means all episodes in the batch failed (usually expired content), but one or more files may still have downloaded before that. Always check for files on codes 0, 1, and 6.
+**get_iplayer exit codes:** The exit code is `$failcount` — the number of episodes that failed to download. Hard failures (where no files could have been written) are codes `3` (bad args), `5` (bad type), `7` (abort-on-fail), and `11`/`12` (internal errors). Any other non-zero code — including `1`, `6`, `8`, or any higher count — means N episodes failed but files may still be present, so always scan for downloaded files before giving up.
 
 **Episode deduplication:** Processed PIDs are written to `.get_iplayer/processed_pids.txt`. PIDs are extracted from get_iplayer's output filenames (e.g. `News_Update_for_Somerset_-_09_30_Update_p0nldk7z_original.m4a`). `--force` and `--overwrite` are intentionally absent from the get_iplayer command so its own history also prevents re-downloads.
 
@@ -87,6 +88,15 @@ scheduler.py (APScheduler cron)
 `config/config-local.yaml` is used for local development (DEBUG logging, local paths). `config/config.yaml` is production (Docker paths). The `BBC_CONFIG` environment variable overrides the search path.
 
 Programmes need a `url` pointing to a BBC series/brand PID (e.g. `https://www.bbc.co.uk/programmes/p08dy4zh`). Set `pid_recursive: true` so get_iplayer fetches individual episodes from the series. `since` and `available_since` control how far back to look.
+
+## Versioning
+
+Version must be kept in sync across two files:
+
+- `pyproject.toml` — `version = "x.y.z"`
+- `src/__init__.py` — `__version__ = "x.y.z"`
+
+`health_monitor.py` reads version from config at runtime; the `"1.0.0"` there is just a fallback default and does not need updating.
 
 ## Releases
 
