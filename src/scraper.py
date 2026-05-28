@@ -178,7 +178,7 @@ class BBCScraper:
             _hard_fail_codes = {3, 5, 7, 11, 12}
             if result.returncode == 0:
                 logging.info("Download completed for: %s", programme_name)
-            elif result.returncode < 0 or result.returncode in _hard_fail_codes: 
+            elif result.returncode < 0 or result.returncode in _hard_fail_codes:
                 logging.error(
                     f"get_iplayer failed for {programme_name} (code {result.returncode}): {result.stderr}"
                 )

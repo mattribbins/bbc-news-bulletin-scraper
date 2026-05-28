@@ -618,7 +618,10 @@ class TestScraperReturnCodes:
         from scraper import BBCScraper
 
         config = {
-            "download": {"temp_path": str(tmp_path / "downloads"), "timeout_seconds": 60},
+            "download": {
+                "temp_path": str(tmp_path / "downloads"),
+                "timeout_seconds": 60,
+            },
             "output": {"base_path": str(tmp_path / "output")},
             "get_iplayer": {"cache_dir": str(tmp_path / ".get_iplayer")},
             "audio": {"format": "wav", "quality": "high"},
@@ -701,7 +704,9 @@ class TestScraperReturnCodes:
             patch.object(BBCScraper, "_process_downloaded_file", return_value=None),
         ):
             result = scraper.download_programme(programme)
-            assert result["success"] is True, f"code {code} should fall through to file scan"
+            assert (
+                result["success"] is True
+            ), f"code {code} should fall through to file scan"
             mock_find.assert_called_once()
 
     # --- hard-fail codes — should return success: False immediately ---
@@ -711,7 +716,9 @@ class TestScraperReturnCodes:
         from scraper import BBCScraper
 
         with (
-            patch("subprocess.run", return_value=self._make_run_result(code, stderr="err")),
+            patch(
+                "subprocess.run", return_value=self._make_run_result(code, stderr="err")
+            ),
             patch.object(
                 BBCScraper, "_find_downloaded_files", return_value=[]
             ) as mock_find,
@@ -733,7 +740,9 @@ class TestScraperReturnCodes:
             ) as mock_find,
         ):
             result = scraper.download_programme(programme)
-            assert result["success"] is False, f"code {code} (signal) should be a hard failure"
+            assert (
+                result["success"] is False
+            ), f"code {code} (signal) should be a hard failure"
             mock_find.assert_not_called()
 
 
