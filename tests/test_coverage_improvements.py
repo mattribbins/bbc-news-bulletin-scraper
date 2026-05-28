@@ -250,6 +250,102 @@ class TestHealthMonitorCoverage:
         assert monitor._check_recent_errors()["status"] == "fail"  # pylint: disable=protected-access
 
 
+class TestScraperCoverage:
+    @pytest.fixture()
+    def scraper(self, tmp_path):
+        from scraper import BBCScraper
+
+        config = {
+            "download": {"temp_path": str(tmp_path / "downloads")},
+            "output": {"base_path": str(tmp_path / "output")},
+            "get_iplayer": {"cache_dir": str(tmp_path / ".get_iplayer")},
+            "audio": {"format": "wav", "quality": "high"},
+        }
+        verify = MagicMock(returncode=0)
+        with patch("subprocess.run", return_value=verify):
+            return BBCScraper(config)
+
+    def test_extract_pid_from_url_and_pid_string(self, scraper):
+        pid = scraper._extract_pid_from_url(  # pylint: disable=protected-access
+            "https://www.bbc.co.uk/programmes/p08dy4zh"
+        )
+        assert pid == "p08dy4zh"
+        assert (
+            scraper._extract_pid_from_url("p123abcd") == "p123abcd"  # pylint: disable=protected-access
+        )
+        assert scraper._extract_pid_from_url("") is None  # pylint: disable=protected-access
+
+    def test_build_command_uses_url_when_pid_not_extractable(self, scraper):
+        cmd = scraper._build_get_iplayer_command(  # pylint: disable=protected-access
+            {"name": "X", "url": "https://example.com/not-bbc"}
+        )
+        assert "--url" in cmd
+
+    def test_build_command_raises_when_no_url_or_pid(self, scraper):
+        with pytest.raises(ValueError):
+            scraper._build_get_iplayer_command({"name": "X"})  # pylint: disable=protected-access
+
+    def test_programme_match_and_quality_mapping(self, scraper):
+        assert scraper._is_programme_match("local_update_p08dy4zh.wav", "BBC Local Update")  # pylint: disable=protected-access
+        assert not scraper._is_programme_match("sports_news.wav", "BBC Local Update")  # pylint: disable=protected-access
+        assert scraper._map_audio_quality("unknown") == "std"  # pylint: disable=protected-access
+
+    def test_pid_mark_and_check_processed(self, scraper):
+        pid = "p123abcd"
+        assert scraper._is_pid_processed(pid) is False  # pylint: disable=protected-access
+        scraper._mark_pid_processed(pid)  # pylint: disable=protected-access
+        assert scraper._is_pid_processed(pid) is True  # pylint: disable=protected-access
+
+    def test_find_downloaded_files_ignores_processed_and_partial(self, scraper):
+        fresh = scraper.temp_dir / "BBC_Local_Update_p08dy4zh_.wav"
+        old = scraper.temp_dir / "BBC_Local_Update_p08old01_.wav"
+        partial = scraper.temp_dir / "BBC_Local_Update.partial.wav"
+        for file_path in [fresh, old, partial]:
+            file_path.write_text("x", encoding="utf-8")
+
+        scraper._mark_pid_processed("p08old01")  # pylint: disable=protected-access
+        results = scraper._find_downloaded_files("BBC Local Update")  # pylint: disable=protected-access
+        assert results == [fresh]
+
+    def test_generate_output_filename_uses_fallback_name(self, scraper):
+        path = scraper._generate_output_filename({"name": "My Bulletin"})  # pylint: disable=protected-access
+        assert path.name == "my_bulletin.wav"
+
+    def test_cleanup_temp_file_handles_missing_file(self, scraper):
+        missing = scraper.temp_dir / "missing.wav"
+        scraper._cleanup_temp_file(missing)  # pylint: disable=protected-access
+
+
+class TestAudioProcessorCoverage:
+    def test_get_audio_info_and_duration_and_validation(self, tmp_path):
+        from audio_processor import AudioProcessor
+
+        processor = AudioProcessor({"audio": {"format": "wav"}})
+        audio_file = tmp_path / "a.wav"
+        audio_file.write_text("x", encoding="utf-8")
+
+        probe_output = (
+            '{"format":{"duration":"12.5"},'
+            '"streams":[{"codec_type":"audio"},{"codec_type":"video"}]}'
+        )
+        result = MagicMock(returncode=0, stdout=probe_output, stderr="")
+        with patch("subprocess.run", return_value=result):
+            info = processor.get_audio_info(audio_file)
+            assert info is not None
+            assert processor.get_duration(audio_file) == 12.5
+            assert processor.validate_audio_file(audio_file) is True
+
+    def test_get_audio_info_handles_probe_failure(self, tmp_path):
+        from audio_processor import AudioProcessor
+
+        processor = AudioProcessor({"audio": {"format": "wav"}})
+        audio_file = tmp_path / "a.wav"
+        audio_file.write_text("x", encoding="utf-8")
+        result = MagicMock(returncode=1, stdout="", stderr="bad")
+        with patch("subprocess.run", return_value=result):
+            assert processor.get_audio_info(audio_file) is None
+
+
 def test_health_handler_routes():
     from health_monitor import HealthCheckHandler
 
