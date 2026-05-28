@@ -379,3 +379,4 @@ def test_main_signal_handler_invokes_shutdown(caplog):
         app._signal_handler(15)  # pylint: disable=protected-access
 
     app.shutdown.assert_called_once()
+    assert "Received signal 15" in caplog.text
