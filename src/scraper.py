@@ -172,13 +172,13 @@ class BBCScraper:
             # 6   = all episodes in batch failed (files may still exist if some downloaded
             #       before others 404'd - check for files anyway)
             # 7   = --download-abortonfail triggered (hard fail)
-            # N>0 = $failcount: N episodes matched and all N failed to download; files may
+            # other codes >0 (not listed above) = $failcount: N episodes matched and all N failed to download; files may
             #       still be present if any partially completed (treat like code 6)
             # 11,12 = internal errors (hard fail)
             _hard_fail_codes = {3, 5, 7, 11, 12}
             if result.returncode == 0:
                 logging.info("Download completed for: %s", programme_name)
-            elif result.returncode in _hard_fail_codes:
+            elif result.returncode < 0 or result.returncode in _hard_fail_codes: 
                 logging.error(
                     f"get_iplayer failed for {programme_name} (code {result.returncode}): {result.stderr}"
                 )
